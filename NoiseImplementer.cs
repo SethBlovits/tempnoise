@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
 using NoiseGeneratorUtil;
+using Unity.Processors;
 
 public class NoiseImplementer : MonoBehaviour
 {
@@ -11,6 +12,9 @@ public class NoiseImplementer : MonoBehaviour
     [SerializeField] int height = 256;
     [SerializeField] int scale = 10;
     [SerializeField] float perlinOffset = 10;
+    [SerializeField] float lacunarity = 1;
+    [SerializeField] float persistence = 1;
+    [SerializeField] int octaves = 3;
 
 
 }
@@ -22,6 +26,10 @@ public class NoiseImplementer : MonoBehaviour
         private SerializedProperty pointsProperty;
         private SerializedProperty scaleProperty;
         private SerializedProperty offsetProperty;
+        private SerializedProperty lacunarityProperty;
+        private SerializedProperty persistenceProperty;
+        private SerializedProperty octavesProperty;
+
         Texture2D PerlinWorley;
         private void OnEnable() {
             widthProperty = serializedObject.FindProperty("width");
@@ -29,6 +37,9 @@ public class NoiseImplementer : MonoBehaviour
             pointsProperty = serializedObject.FindProperty("numPoints");
             scaleProperty = serializedObject.FindProperty("scale");
             offsetProperty = serializedObject.FindProperty("perlinOffset");
+            lacunarityProperty = serializedObject.FindProperty("lacunarity");
+            persistenceProperty = serializedObject.FindProperty("persistence");
+            octavesProperty = serializedObject.FindProperty("octaves")
             
         }
         
@@ -41,6 +52,9 @@ public class NoiseImplementer : MonoBehaviour
             int numPoints = pointsProperty.intValue;
             int scale = scaleProperty.intValue;
             float offset = offsetProperty.floatValue;
+            float lacunarity = lacunarityProperty.floatValue;
+            float persistence = persistenceProperty.floatValue;
+            int octaves = octavesProperty.intValue;
         
             if(GUILayout.Button("Generate Worley",GUILayout.Width(180f))){
                 //Texture2D WorlyNoise = NoiseGenerator.worleyNoise(256,256,10);
@@ -58,7 +72,7 @@ public class NoiseImplementer : MonoBehaviour
             }
             if(GUILayout.Button("Generate Perlin-Worley",GUILayout.Width(180f))){
                 //Texture2D WorlyNoise = NoiseGenerator.worleyNoise(256,256,10);
-                PerlinWorley = NoiseGenerator.perlinWorley(width,height,numPoints,scale,offset);
+                PerlinWorley = NoiseGenerator.perlinWorley(width,height,numPoints,scale,octaves,lacunarity,persistence);
                 //GUI.DrawTexture(new Rect(200, 200, 100, 100),PerlinWorley);
             }
             if(GUILayout.Button("Save Perlin-Worley",GUILayout.Width(180f))){
@@ -177,27 +191,29 @@ namespace NoiseGeneratorUtil
             worleyFBM.Apply();
             return worleyFBM;
         }
-        public static Texture2D perlinFBM(int width,int height){
-            Texture2D perlin1 = perlinNoise(width,height,100,1);
-            Texture2D perlin2 = perlinNoise(width,height,10,2);
-            Texture2D perlin3 = perlinNoise(width,height,2,3);
-
+        public static Texture2D perlinFBM(int width,int height,int octaves,float lacunarity,float persistence){
             Texture2D perlinFBM = new Texture2D(width,height);
-            
-            for(int x=0;x<width;x++){
-                for(int y=0;y<height;y++){
-                    Color noise = perlin1.GetPixel(x,y)*0.625f+perlin2.GetPixel(x,y)*0.25f+perlin3.GetPixel(x,y)*0.125f;
-                    perlinFBM.SetPixel(x,y,noise);
+            for(int x = 0;x<width;x++){
+                for(int y = 0;y<height;y++){
+                    float frequency = 1.0f / width*height;
+                    float amplitude = persistence;
+                    float noise = 0;
+                    for(int i = 0;i<octaves;i++){
+                        noise += Mathf.PerlinNoise(x * frequency,y*frequency)*amplitude;
+                        frequency *= lacunarity;
+                        amplitude *= persistence;
+                    }
+                    perlinFBM.SetPixel(x,y,new Color(noise,noise,noise));
                 }
             }
-        
-            return perlinFBM;
+            return perlinFBM; 
         }
-        public static Texture2D perlinWorley(int width,int height,int numPoints,int scale,float perlinOffset){
+        public static Texture2D perlinWorley(int width,int height,int numPoints,int octaves, float lacunarity,float persistence){
             Texture2D perlinWorley = new Texture2D(width,height);
             //Texture2D tempWorley = worleyFBM(width,height);
             //Texture2D tempPerlin = perlinFBM(width,height);
-            Texture2D tempPerlin = perlinNoise(width,height,scale,perlinOffset);
+            //Texture2D tempPerlin = perlinNoise(width,height,scale,perlinOffset);
+            Texture2D tempPerlin = perlinFBM(width,height,octaves,lacunarity,persistence);
 
             for(int x=0;x<width;x++){
                 for(int y=0;y<height;y++){
